@@ -73,7 +73,7 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
 
         double lat = location.getLatitude();
         double lng = location.getLongitude();
-
+        mMap.clear();
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat, lng),18));
         mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)).title("Your Location"));
     }
