@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Criteria;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -33,6 +34,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,6 +44,8 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
     private GoogleMap mMap;
     LocationManager locationManager;
     String provider;
+    String result;
+    List<LocationData> locationDataList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,26 +68,49 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
         double lat = location.getLatitude();
         double lng = location.getLongitude();
 
-        String result;
         ListView listView = (ListView)findViewById(R.id.nearbyList);
+        locationDataList = new ArrayList<>();
+        ArrayList<String> places = new ArrayList<>();
         DownloadPlacesJSON task = new DownloadPlacesJSON();
         //execute class that will download list of nearby places using google API
         try {
-            result = task.execute("https://maps.googleapis.com/maps/api/place/nearbysearch/xml?" +
+            result = task.execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
                 "location="+String.valueOf(lat)+","+String.valueOf(lng)+"&radius=1000&type=nearby%20places" +
                 "&sensor=true&key=AIzaSyB_F-oerBg1ldX3d1uw-btRhd2XKzI4pwg").get();
 
-            Pattern p1 = Pattern.compile("<name>(.*?)</name>");       //Getting names of nearby places places
-            Matcher m1 = p1.matcher(result);                        //and then arrange them in the Arraylist locationDatas
-            ArrayList<String> places = new ArrayList<>();
-            while (m1.find()) {
-                places.add(m1.group(1));     //adding places to arraylist as it is found in the string
+            String crappyPrefix = "null";
+
+            if(result.startsWith(crappyPrefix)){
+                result = result.substring(crappyPrefix.length(), result.length());
             }
+            JSONObject jo = new JSONObject(result);
+            String res = jo.getString("results");
+            JSONArray ja = new JSONArray(res);
+            for (int i=0;i<15;i++) {
+                LocationData locationData = new LocationData();
+                String loc = ja.getString(i);
+                JSONObject obj = new JSONObject(loc);
+                String geo = obj.getString("geometry");
+                String name = obj.getString("name");
+                places.add(name);
+                locationData.setName(name);
+                JSONObject locatn = new JSONObject(geo);
+                String locate = locatn.getString("location");
+                JSONObject latlng = new JSONObject(locate);
+                locationData.setLat(latlng.getDouble("lat"));
+                locationData.setLng(latlng.getDouble("lng"));
+                Log.i("latitude", String.valueOf(latlng.getDouble("lat")));
+                locationDataList.add(locationData);
+            }
+
+
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, places);
             listView.setAdapter(adapter);
-        } catch (InterruptedException | ExecutionException e) {
+
+        } catch (InterruptedException | ExecutionException | JSONException e) {
             e.printStackTrace();
         }
+
     }
 
     @Override
