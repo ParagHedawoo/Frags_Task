@@ -2,9 +2,9 @@ package com.example.paraghedawoo.frags_task;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Criteria;
-import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -12,16 +12,19 @@ import android.os.AsyncTask;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
-import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ListView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import org.json.JSONArray;
@@ -34,10 +37,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ExecutionException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class LocationActivity extends FragmentActivity implements OnMapReadyCallback, LocationListener {
 
@@ -46,6 +46,10 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
     String provider;
     String result;
     List<LocationData> locationDataList;
+    ImageButton myLocation;
+    Marker marker;
+    ImageButton sendLocation;
+    LocationData sendLocationData;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,15 +62,22 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE); //access service to know device location
         provider = locationManager.getBestProvider(new Criteria(), false);  // string that stores data of best provider of location data
+        myLocation = (ImageButton) findViewById(R.id.myLocation);
+        sendLocation = (ImageButton) findViewById(R.id.send);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-
         //get location stored in device
         Location location = locationManager.getLastKnownLocation(provider);
-        double lat = location.getLatitude();
-        double lng = location.getLongitude();
+        final double lat = location.getLatitude();
+        final double lng = location.getLongitude();
+
+        sendLocationData = new LocationData(); // this object created to temporarily save location data
+
+        sendLocationData.setName("My Location");
+        sendLocationData.setLat(lat);
+        sendLocationData.setLng(lng);
 
         ListView listView = (ListView)findViewById(R.id.nearbyList);
         locationDataList = new ArrayList<>();
@@ -75,18 +86,19 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
         //execute class that will download list of nearby places using google API
         try {
             result = task.execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
-                "location="+String.valueOf(lat)+","+String.valueOf(lng)+"&radius=1000&type=nearby%20places" +
-                "&sensor=true&key=AIzaSyB_F-oerBg1ldX3d1uw-btRhd2XKzI4pwg").get();
+                    "location=" + String.valueOf(lat) + "," + String.valueOf(lng) + "&radius=1000&type=nearby%20places" +
+                    "&sensor=true&key=AIzaSyB_F-oerBg1ldX3d1uw-btRhd2XKzI4pwg").get();
 
             String crappyPrefix = "null";
 
-            if(result.startsWith(crappyPrefix)){
+            if (result.startsWith(crappyPrefix)) {
                 result = result.substring(crappyPrefix.length(), result.length());
             }
             JSONObject jo = new JSONObject(result);
             String res = jo.getString("results");
             JSONArray ja = new JSONArray(res);
-            for (int i=0;i<15;i++) {
+            // sorting put names and location from JSON data string
+            for (int i = 0; i < 15; i++) {
                 LocationData locationData = new LocationData();
                 String loc = ja.getString(i);
                 JSONObject obj = new JSONObject(loc);
@@ -99,10 +111,8 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
                 JSONObject latlng = new JSONObject(locate);
                 locationData.setLat(latlng.getDouble("lat"));
                 locationData.setLng(latlng.getDouble("lng"));
-                Log.i("latitude", String.valueOf(latlng.getDouble("lat")));
                 locationDataList.add(locationData);
             }
-
 
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, places);
             listView.setAdapter(adapter);
@@ -111,6 +121,46 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
             e.printStackTrace();
         }
 
+        // on clicking an item on the nearby list, one can get to its location
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                LatLng latLng = new LatLng(locationDataList.get(position).getLat(), locationDataList.get(position).getLng());
+                mMap.clear();
+                marker = mMap.addMarker(new MarkerOptions().position(latLng).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 18));
+                sendLocationData.setName(locationDataList.get(position).getName());
+                sendLocationData.setLat(latLng.latitude);
+                sendLocationData.setLng(latLng.longitude);
+            }
+        });
+
+        // the button to redirect you to your own location
+        myLocation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mMap.clear();
+                marker = mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)).title("Your Location")); // add a marker over location
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat, lng),18)); // move camera to the specified lat-lng
+                sendLocationData.setName("My Location");
+                sendLocationData.setLat(lat);
+                sendLocationData.setLng(lng);
+            }
+        });
+
+        //the button to send your location to the main activity
+        sendLocation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Bundle bundle = new Bundle();
+                Intent i = new Intent(getApplicationContext(), MainActivity.class);
+                bundle.putString("Name", sendLocationData.getName());
+                bundle.putString("Lat", String.valueOf(sendLocationData.getLat()));
+                bundle.putString("Lng", String.valueOf(sendLocationData.getLng()));
+                i.putExtras(bundle);
+                startActivity(i);
+            }
+        });
     }
 
     @Override
@@ -145,9 +195,8 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
         double lat = location.getLatitude(); // get latitude
         double lng = location.getLongitude(); // get longitude
         mMap.clear(); //clear position of previous marker
+        marker=mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)).title("Your Location")); // add a marker over location
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat, lng),18)); // move camera to the specified lat-lng
-        mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)).title("Your Location")); // add a marker over location
-
     }
 
     @Override
@@ -164,6 +213,7 @@ public class LocationActivity extends FragmentActivity implements OnMapReadyCall
     public void onProviderDisabled(String provider) {
 
     }
+
 }
 
 // class created to download nearby places data

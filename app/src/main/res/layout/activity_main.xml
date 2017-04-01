@@ -11,8 +11,29 @@
         android:id="@+id/sendLocation"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_centerVertical="true"
         android:onClick="onClick"
-        android:text="Send Location" />
+        android:text="Send Location"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="162dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:foregroundGravity="center"
+        android:textSize="25sp"
+        android:layout_gravity="center"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:id="@+id/locationText" />
+
+    <TextView
+        android:id="@+id/latlngText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="15sp"
+        android:layout_below="@+id/locationText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp" />
+
 </RelativeLayout>
